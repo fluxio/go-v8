@@ -75,21 +75,22 @@ Good luck!
 
 The list of v8 includes the bindings depend on:
 
-    include/libplatform/libplatform.h
-    include/v8-testing.h
-    include/v8.h
-    include/v8config.h
-    include/v8-version.h
-    include/v8-platform.h
-    include/v8-debug.h
-    include/v8-profiler.h
+    libplatform/libplatform.h
+    v8-testing.h
+    v8.h
+    v8config.h
+    v8-version.h
+    v8-platform.h
+    v8-debug.h
+    v8-profiler.h
 
+Copy those to `$GO_V8/libv8/include/` (or just set the `-I` to `$V8/include`).
 
 ### Let cgo know where the library is located.
 
 Let cgo know where it should look for the libraries do:
 
-    export CGO_CXXFLAGS="-I $V8/include"
+    export CGO_CXXFLAGS="-I $GO_V8/libv8/include"
     export CGO_LDFLAGS="-L $GO_V8/libv8"
 
 License

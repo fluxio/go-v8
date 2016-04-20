@@ -100,6 +100,7 @@ License
 -------
 
 This software is licensed under Apache License, Version 2.0. Please see
-[LICENSE](https://github.com/fluxio/go-v8/LICENSE) for more information.
+[LICENSE](https://raw.githubusercontent.com/fluxio/go-v8/master/LICENSE)
+for more information.
 
 Copyright© 2016, Flux Factory Inc.

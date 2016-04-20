@@ -17,24 +17,26 @@ In order for the bingings to compile correctly, one needs to:
 1. Compile v8 as a static library or just use a pre-built version.
 2. Let cgo know where the library is located.
 
-Lets say you've checked out the v8 source into `$V8`, go-v8 into `$GO_V8` and
-want to place the static v8 library into `$GO_V8/libv8/`.
+Lets say you've checked out go-v8 into `$GO_V8` and want to place
+the static v8 library into `$GO_V8/libv8/`.
 
 ### Recommended: use a pre-built static library
 
-Just grab a pre-built artifacts:
+Just grab the pre-built artifacts:
 
     cd $GO_V8
     git clone https://github.com/forwidur/libv8
 
 ### Compiling v8 from scratch
 
-Download [v8](https://github.com/v8/v8/wiki/Using%20Git).
+Check out [v8](https://github.com/v8/v8/wiki/Using%20Git) into a directory,
+referred to here as `$V8`.
 
 #### Linux
 
 Build:
 
+    cd $V8
     make x64.release GYPFLAGS="-Dv8_use_external_startup_data=0 \
       -Dv8_enable_i18n_support=0 -Dv8_enable_gdbjit=0"`
 
@@ -54,6 +56,7 @@ Copy the libraries to the destination directory:
 
 To build:
 
+    cd $V8
     CXX="`which clang++` -std=c++11 -stdlib=libc++" \
     GYP_DEFINES="mac_deployment_target=10.10" \
     make x64.release GYPFLAGS="-Dv8_use_external_startup_data=0 \
@@ -73,7 +76,7 @@ Good luck!
 
 #### V8 compile dependencies
 
-The list of v8 includes the bindings depend on:
+The list of v8 includes (found in `$V8/include`) the bindings depend on:
 
     libplatform/libplatform.h
     v8-testing.h
@@ -86,7 +89,7 @@ The list of v8 includes the bindings depend on:
 
 Copy those to `$GO_V8/libv8/include/` (or just set the `-I` to `$V8/include`).
 
-### Let cgo know where the library is located.
+### Let cgo know where the library is located
 
 Let cgo know where it should look for the libraries do:
 

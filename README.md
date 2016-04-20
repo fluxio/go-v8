@@ -1,5 +1,6 @@
 Go-V8 Bindings
 ===
+
 The go-V8 bindings allow a user to execute javascript from within a go
 executable.
 
@@ -10,18 +11,25 @@ Please see `v8_test.go` for examples of usage.
 
 Compiling
 ---
+
 In order for the bingings to compile correctly, one needs to:
 
-1. Compile v8 as a static library.
+1. Compile v8 as a static library or just use a pre-built version.
 2. Let cgo know where the library is located.
-
-
-### Compiling v8.
-
-Download v8: https://github.com/v8/v8/wiki/Using%20Git
 
 Lets say you've checked out the v8 source into `$V8`, go-v8 into `$GO_V8` and
 want to place the static v8 library into `$GO_V8/libv8/`.
+
+### Recommended: use a pre-built static library
+
+Just grab a pre-built artifacts:
+
+    cd $GO_V8
+    git clone https://github.com/forwidur/libv8
+
+### Compiling v8 from scratch
+
+Download [v8](https://github.com/v8/v8/wiki/Using%20Git).
 
 #### Linux
 
@@ -67,7 +75,6 @@ Good luck!
 
 The list of v8 includes the bindings depend on:
 
-    include/libplatform
     include/libplatform/libplatform.h
     include/v8-testing.h
     include/v8.h
@@ -87,6 +94,7 @@ Let cgo know where it should look for the libraries do:
 
 License
 -------
+
 This software is licensed under Apache License, Version 2.0. Please see
 [LICENSE](https://github.com/fluxio/go-v8/LICENSE) for more information.
 

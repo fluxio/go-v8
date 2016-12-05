@@ -11,6 +11,14 @@ import (
 	"time"
 )
 
+func toJsonOrFatal(v *Value, t *testing.T) string {
+	json, err := v.ToJSON()
+	if err != nil {
+		t.Fatal("Could not convert value to JSON:", err)
+	}
+	return json
+}
+
 func TestCreateV8Context(t *testing.T) {
 	ctx := NewContext()
 	res, err := ctx.Eval(`
@@ -505,7 +513,7 @@ func TestEvalRaw(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	jsonstr := val.ToJSON()
+	jsonstr := toJsonOrFatal(val, t)
 	expected := `{"a":3,"b":{"c":"asdf"}}`
 	if jsonstr != expected {
 		t.Fatalf("JSON mismatch:\n  Expected:'%s'\n       Got: '%s'", expected, jsonstr)
@@ -519,8 +527,8 @@ func TestFromJson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if val.ToJSON() != json {
-		t.Fatalf("JSON mismatch:\n  Expected:'%s'\n       Got: '%s'", json, val.ToJSON())
+	if toJsonOrFatal(val, t) != json {
+		t.Fatalf("JSON mismatch:\n  Expected:'%s'\n       Got: '%s'", json, toJsonOrFatal(val, t))
 	}
 }
 
@@ -540,8 +548,8 @@ func TestApply(t *testing.T) {
 
 	res := must(ctx.Apply(f, f, a, b))
 	t.Log(res)
-	if res.ToJSON() != "10" {
-		t.Fatal("Expected 10, got ", res.ToJSON())
+	if toJsonOrFatal(res, t) != "10" {
+		t.Fatal("Expected 10, got ", toJsonOrFatal(res, t))
 	}
 }
 
@@ -563,14 +571,14 @@ func TestApplyWithThis(t *testing.T) {
 
 	res := must(ctx.Apply(f, y1, x))
 	t.Log(res)
-	if res.ToJSON() != "8" {
-		t.Fatal("Expected 8, got ", res.ToJSON())
+	if toJsonOrFatal(res, t) != "8" {
+		t.Fatal("Expected 8, got ", toJsonOrFatal(res, t))
 	}
 
 	res = must(ctx.Apply(f, y2, x))
 	t.Log(res)
-	if res.ToJSON() != "12" {
-		t.Fatal("Expected 12, got ", res.ToJSON())
+	if toJsonOrFatal(res, t) != "12" {
+		t.Fatal("Expected 12, got ", toJsonOrFatal(res, t))
 	}
 }
 
@@ -589,16 +597,16 @@ func TestRawFunc(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if arg.ToJSON() != `"blah"` {
-		t.Fatal("Expected '\"blah\"', got ", arg.ToJSON())
+	if toJsonOrFatal(arg, t) != `"blah"` {
+		t.Fatal("Expected '\"blah\"', got ", toJsonOrFatal(arg, t))
 	}
 
 	arg, err = ctx.EvalRaw("lastarg(1,2,3,4)", "some_test_file.js")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if arg.ToJSON() != `4` {
-		t.Fatal("Expected '4', got ", arg.ToJSON())
+	if toJsonOrFatal(arg, t) != `4` {
+		t.Fatal("Expected '4', got ", toJsonOrFatal(arg, t))
 	}
 }
 
@@ -610,8 +618,8 @@ func TestRawFuncReturnNull(t *testing.T) {
 	if err != nil {
 		t.Fatal("error", err)
 	}
-	if arg.ToJSON() != "undefined" {
-		t.Fatal("Expected undefined, got ", arg.ToJSON())
+	if toJsonOrFatal(arg, t) != "undefined" {
+		t.Fatal("Expected undefined, got ", toJsonOrFatal(arg, t))
 	}
 }
 
@@ -689,8 +697,8 @@ func TestCreateJS(t *testing.T) {
 		t.Fatal(err)
 	}
 	expected := `{"a":1,"b":{"c":3}}`
-	if val.ToJSON() != expected {
-		t.Fatalf("Expected '%s', got '%s'", expected, val.ToJSON())
+	if toJsonOrFatal(val, t) != expected {
+		t.Fatalf("Expected '%s', got '%s'", expected, toJsonOrFatal(val, t))
 	}
 }
 
@@ -707,8 +715,8 @@ func TestToValue(t *testing.T) {
 		t.Fatal(err)
 	}
 	expected := `{"One":1,"Two":"two"}`
-	if val.ToJSON() != expected {
-		t.Fatalf("Expected '%s', got '%s'", expected, val.ToJSON())
+	if toJsonOrFatal(val, t) != expected {
+		t.Fatalf("Expected '%s', got '%s'", expected, toJsonOrFatal(val, t))
 	}
 }
 
@@ -733,8 +741,8 @@ func TestToValueFunc(t *testing.T) {
 		t.Fatal("Function was never called")
 	}
 	expected := "17"
-	if val.ToJSON() != expected {
-		t.Fatalf("Expected '%s', got '%s'", expected, val.ToJSON())
+	if toJsonOrFatal(val, t) != expected {
+		t.Fatalf("Expected '%s', got '%s'", expected, toJsonOrFatal(val, t))
 	}
 }
 
@@ -757,14 +765,14 @@ func TestBurst(t *testing.T) {
 
 	if a, ok := vals["a"]; !ok {
 		t.Fatal("Vals missing field 'a': ", vals)
-	} else if a.ToJSON() != "1" {
-		t.Fatal("Expected a to be 1, got ", a.ToJSON())
+	} else if toJsonOrFatal(a, t) != "1" {
+		t.Fatal("Expected a to be 1, got ", toJsonOrFatal(a, t))
 	}
 
 	if b, ok := vals["b"]; !ok {
 		t.Fatal("Vals missing field 'b': ", vals)
-	} else if b.ToJSON() != `{"c":3}` {
-		t.Fatal(`Expected b to be '{"c":3}', got `, b.ToJSON())
+	} else if toJsonOrFatal(b, t) != `{"c":3}` {
+		t.Fatal(`Expected b to be '{"c":3}', got `, toJsonOrFatal(b, t))
 	}
 }
 
@@ -793,7 +801,7 @@ func TestGetObjectField(t *testing.T) {
 	if a, err := ob.Get("a"); err != nil {
 		t.Fatal("Failed getting value: ", err)
 	} else {
-		if a.ToJSON() != "1" {
+		if toJsonOrFatal(a, t) != "1" {
 			t.Fatal("Expected '1', got ", a)
 		}
 	}
@@ -833,8 +841,8 @@ func TestSetObjectField(t *testing.T) {
 	}
 
 	// Make sure the object actually holds those fields:
-	if ob.ToJSON() != `{"foo":3}` {
-		t.Errorf("Object should have foo field, but is: [%v]", ob.ToJSON())
+	if toJsonOrFatal(ob, t) != `{"foo":3}` {
+		t.Errorf("Object should have foo field, but is: [%v]", toJsonOrFatal(ob, t))
 	}
 
 	// Make sure we can't set fields on a number:
@@ -943,7 +951,7 @@ func TestValueAcrossContextsFails(t *testing.T) {
 		t.Fatal("Missing expected map key:", m)
 	}
 
-	if val.ToJSON() != `{"s":4}` {
+	if toJsonOrFatal(val, t) != `{"s":4}` {
 		t.Error("Value does not work across contexts.")
 	}
 }
@@ -986,4 +994,30 @@ func TestThrow(t *testing.T) {
 	} else if res.(float64) != 3 {
 		t.Error("Wrong result: ", res)
 	}
+}
+
+func TestSelfReference(t *testing.T) {
+	assertCircularErr := func(e error) {
+		switch {
+		case e == nil:
+			t.Error("Expected circular JSON error but received nil")
+		case !strings.Contains(e.Error(), "circular"):
+			t.Error("Expected circular JSON error but received:", e)
+		}
+	}
+
+	const circularJs = "var test={}; test.blah=test;"
+
+	// Pure Eval() should return an error
+	ctx := NewContext()
+	_, err := ctx.Eval(circularJs, NO_FILE)
+	assertCircularErr(err)
+
+	// EvalRaw should work. But ToJSON should fail
+	val, err := ctx.EvalRaw(circularJs, NO_FILE)
+	if err != nil {
+		t.Fatal("Unexpected EvalRaw error:", err)
+	}
+	_, err = val.ToJSON()
+	assertCircularErr(err)
 }

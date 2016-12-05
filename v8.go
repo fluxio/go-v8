@@ -36,13 +36,19 @@ type Value struct {
 }
 
 // ToJSON converts the value to a JSON string.
-func (v *Value) ToJSON() string {
+func (v *Value) ToJSON() (string, error) {
 	if v.ctx == nil || v.ptr == nil {
 		panic("Value or context were reset.")
 	}
 	str := C.PersistentToJSON(v.ctx.v8context, v.ptr)
+	if str == nil {
+		err := C.v8_error(v.ctx.v8context)
+		out := C.GoString(err)
+		C.free(unsafe.Pointer(err))
+		return "", errors.New(out)
+	}
 	defer C.free(unsafe.Pointer(str))
-	return C.GoString(str)
+	return C.GoString(str), nil
 }
 
 // ToString converts a value holding a JS String to a string.  If the value
@@ -51,8 +57,12 @@ func (v *Value) ToString() (string, error) {
 	if v.ctx == nil || v.ptr == nil {
 		panic("Value or context were reset.")
 	}
+	jsonStr, err := v.ToJSON()
+	if err != nil {
+		return "", err
+	}
 	var str string
-	err := json.Unmarshal([]byte(v.ToJSON()), &str)
+	err = json.Unmarshal([]byte(jsonStr), &str)
 	return str, err
 }
 
@@ -70,7 +80,7 @@ func (v *Value) Burst() (map[string]*Value, error) {
 	if keyValuesPtr == nil {
 		err := C.v8_error(v.ctx.v8context)
 		defer C.free(unsafe.Pointer(err))
-		return nil, errors.New(C.GoString(err) + ":" + v.ToJSON())
+		return nil, errors.New(C.GoString(err))
 	}
 
 	// Convert the list to a slice:

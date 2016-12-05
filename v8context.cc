@@ -24,8 +24,12 @@ std::string to_json(v8::Isolate* iso, v8::Local<v8::Value> value) {
       json->GetRealNamedProperty(v8::String::NewFromUtf8(iso, "stringify")));
   v8::Local<v8::Value> args[1];
   args[0] = value;
-  v8::String::Utf8Value ret(
-      func->Call(iso->GetCurrentContext()->Global(), 1, args)->ToString());
+  v8::Local<v8::Value> call_result = func->Call(iso->GetCurrentContext()->Global(), 1, args);
+  if (call_result.IsEmpty()) {
+    try_catch.ReThrow();
+    return "";
+  }
+  v8::String::Utf8Value ret(call_result->ToString());
   return *ret;
 }
 
@@ -154,7 +158,12 @@ char* V8Context::Execute(const char* source, const char* filename) {
   if (result->IsFunction() || result->IsUndefined()) {
     return strdup("");
   } else {
-    return strdup(to_json(mIsolate, result).c_str());
+    std::string json = to_json(mIsolate, result);
+    if (json == "") {
+      mLastError = report_exception(try_catch);
+      return NULL;
+    }
+    return strdup(json.c_str());
   }
 }
 
@@ -236,9 +245,15 @@ char* V8Context::PersistentToJSON(PersistentValuePtr persistent) {
   v8::Isolate::Scope isolate_scope(mIsolate);
   v8::HandleScope handle_scope(mIsolate);
   v8::Context::Scope context_scope(mContext.Get(mIsolate));
+  v8::TryCatch try_catch;
   v8::Local<v8::Value> persist =
       static_cast<v8::Persistent<v8::Value>*>(persistent)->Get(mIsolate);
-  return strdup(to_json(mIsolate, persist).c_str());
+  std::string json_str = to_json(mIsolate, persist);
+  if (json_str == "") {
+    mLastError = report_exception(try_catch);
+    return NULL;
+  }
+  return strdup(json_str.c_str());
 }
 
 void V8Context::ReleasePersistent(PersistentValuePtr persistent) {

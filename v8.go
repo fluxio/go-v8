@@ -270,6 +270,23 @@ func NewIsolate() *V8Isolate {
 	return res
 }
 
+func NewIsolateWithSnapshot(js string) (*V8Isolate, error) {
+	jsCstr := C.CString(js)
+	defer C.free(unsafe.Pointer(jsCstr))
+
+	snapshot := C.v8_create_snapshot(jsCstr)
+	if snapshot == nil {
+		return nil, errors.New("Unable to create snapshot from provided javascript")
+	}
+
+	res := &V8Isolate{C.v8_create_isolate_with_snapshot(snapshot)}
+	runtime.SetFinalizer(res, func(i *V8Isolate) {
+		C.v8_release_isolate(i.v8isolate)
+		C.v8_release_snapshot(snapshot)
+	})
+	return res, nil
+}
+
 // NewContext creates a V8 context in a default isolate
 // and returns a handle to it.
 func NewContext() *V8Context {

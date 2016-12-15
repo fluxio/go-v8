@@ -16,8 +16,25 @@ extern "C" IsolatePtr v8_create_isolate() {
   return static_cast<IsolatePtr>(new V8Isolate());
 }
 
+extern "C" IsolatePtr v8_create_isolate_with_snapshot(SnapshotPtr snapshot) {
+  return static_cast<IsolatePtr>(new V8Isolate(static_cast<v8::StartupData *>(snapshot)));
+}
+
 extern "C" void v8_release_isolate(IsolatePtr isolate) {
   delete static_cast<V8Isolate *>(isolate);
+}
+
+extern "C" SnapshotPtr v8_create_snapshot(const char *snapshot_js) {
+  v8::StartupData startup_data = v8::V8::CreateSnapshotDataBlob(snapshot_js);
+  if (startup_data.data == NULL)
+    return NULL;
+  return static_cast<SnapshotPtr>(new v8::StartupData(startup_data));
+}
+
+extern "C" void v8_release_snapshot(SnapshotPtr snapshot) {
+  v8::StartupData *snapshot_ptr = static_cast<v8::StartupData *>(snapshot);
+  delete[] snapshot_ptr->data;
+  delete snapshot_ptr;
 }
 
 extern "C" ContextPtr v8_create_context(IsolatePtr isolate) {

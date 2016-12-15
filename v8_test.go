@@ -1021,3 +1021,34 @@ func TestSelfReference(t *testing.T) {
 	_, err = val.ToJSON()
 	assertCircularErr(err)
 }
+
+func TestIsolateWithSnapshot(t *testing.T) {
+	isoWithSnap, err := NewIsolateWithSnapshot(`var a = 1;`)
+	if err != nil {
+		t.Fatal("Error creating isolate from snapshot, err: ", err)
+	}
+
+	ctxWithSnap := NewContextInIsolate(isoWithSnap)
+	ctxNoSnap := NewContextInIsolate(NewIsolate())
+
+	// The context with the snapshot should have 'a' defined
+	res, err := ctxWithSnap.Eval("a", NO_FILE)
+	if err != nil {
+		t.Error("Error evaluating javascript, err: ", err)
+	}
+	if v, ok := res.(float64); !ok || v != 1 {
+		t.Error("ctxWithSnap: expected a == 1, but got %v", res)
+	}
+
+	// The context without a snapshot shouldn't have 'a' defined
+	res, err = ctxNoSnap.Eval("a", NO_FILE)
+	if err == nil {
+		t.Error("Expected error evaluating 'a'", err)
+	}
+
+	// Make sure we handle bad javascript gracefully
+	_, err = NewIsolateWithSnapshot(`this is bad js!!!!`)
+	if err == nil {
+		t.Error("Expected error with bad javascript")
+	}
+}

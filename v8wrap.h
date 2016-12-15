@@ -9,12 +9,19 @@ typedef void *IsolatePtr;
 typedef void *ContextPtr;
 typedef void *PersistentValuePtr;
 typedef void *PlatformPtr;
+typedef void *SnapshotPtr;
 
 extern PlatformPtr v8_init();
 
 extern IsolatePtr v8_create_isolate();
 
+extern IsolatePtr v8_create_isolate_with_snapshot(SnapshotPtr snapshot);
+
 extern void v8_release_isolate(IsolatePtr isolate);
+
+extern SnapshotPtr v8_create_snapshot(const char *snapshot_js);
+
+extern void v8_release_snapshot(SnapshotPtr snapshot);
 
 extern ContextPtr v8_create_context(IsolatePtr isolate);
 

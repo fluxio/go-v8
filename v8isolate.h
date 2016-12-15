@@ -15,6 +15,7 @@ class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
 class V8Isolate {
  public:
   V8Isolate();
+  V8Isolate(v8::StartupData* startup_data);
   ~V8Isolate();
 
   V8Context* MakeContext();

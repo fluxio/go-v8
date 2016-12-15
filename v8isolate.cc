@@ -20,6 +20,13 @@ V8Isolate::V8Isolate() {
   isolate_ = v8::Isolate::New(create_params);
 }
 
+V8Isolate::V8Isolate(v8::StartupData* startup_data) {
+  v8::Isolate::CreateParams create_params;
+  create_params.array_buffer_allocator = &allocator;
+  create_params.snapshot_blob = startup_data;
+  isolate_ = v8::Isolate::New(create_params);
+}
+
 V8Context* V8Isolate::MakeContext() { return new V8Context(isolate_); }
 
 V8Isolate::~V8Isolate() { isolate_->Dispose(); }

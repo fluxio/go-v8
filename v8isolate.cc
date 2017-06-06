@@ -32,3 +32,5 @@ V8Context* V8Isolate::MakeContext() { return new V8Context(isolate_); }
 V8Isolate::~V8Isolate() { isolate_->Dispose(); }
 
 void V8Isolate::Terminate() { v8::V8::TerminateExecution(isolate_); }
+
+v8::Unlocker* V8Isolate::Unlock() { return new v8::Unlocker(isolate_); }

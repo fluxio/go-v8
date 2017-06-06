@@ -90,10 +90,23 @@ extern "C" char *v8_error(ContextPtr ctx) {
   return (static_cast<V8Context *>(ctx))->Error();
 }
 
+extern "C" bool v8_context_has_terminated(ContextPtr ctx) {
+  return (static_cast<V8Context *>(ctx))->HasTerminated();
+}
+
 extern "C" void v8_throw(ContextPtr ctx, char *errmsg) {
   return (static_cast<V8Context *>(ctx))->Throw(errmsg);
 }
 
 extern "C" void v8_terminate(IsolatePtr isolate) {
   (static_cast<V8Isolate *>(isolate))->Terminate();
+}
+
+extern UnlockerPtr v8_create_unlocker(IsolatePtr isolate) {
+  return static_cast<UnlockerPtr>(
+      static_cast<V8Isolate *>(isolate)->Unlock());
+}
+
+extern void v8_release_unlocker(UnlockerPtr unlocker) {
+  delete static_cast<v8::Unlocker *>(unlocker);
 }

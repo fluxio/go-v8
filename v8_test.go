@@ -1,6 +1,7 @@
 package v8
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"runtime"
@@ -346,10 +347,11 @@ func TestTerminate(t *testing.T) {
 	ctx := NewContext()
 
 	// Run an infinite loop in a goroutine.
+	var err error
 	done := make(chan bool)
 	go func() {
 		fmt.Println("Running infinite loop:")
-		ctx.Eval("while(1){}", NO_FILE)
+		_, err = ctx.Eval("while(1){}", NO_FILE)
 		fmt.Println("Completed infinite loop!")
 		done <- true
 	}()
@@ -366,6 +368,11 @@ func TestTerminate(t *testing.T) {
 	ctx.Terminate()
 	fmt.Println("Waiting for infinite loop")
 	<-done
+
+	// Make sure that we got an ErrTerminated
+	if err != ErrTerminated {
+		t.Fatalf("Expected ErrTerminated but got %v", err)
+	}
 
 	// Make sure you can call terminate when nothing is running, and it
 	// works alright.
@@ -1050,5 +1057,104 @@ func TestIsolateWithSnapshot(t *testing.T) {
 	_, err = NewIsolateWithSnapshot(`this is bad js!!!!`)
 	if err == nil {
 		t.Error("Expected error with bad javascript")
+	}
+}
+
+func TestUnlocker(t *testing.T) {
+	const timeout = 5 * time.Second
+
+	waitForChannel := func(name string, ch chan struct{}) error {
+		select {
+		case <-time.After(timeout):
+			return fmt.Errorf("Timeout waiting for %s", name)
+		case <-ch:
+			return nil
+		}
+	}
+
+	// Two contexts in the same isolate
+	ctx1, ctx2 := NewContext(), NewContext()
+
+	chUnlockStart := make(chan struct{})
+	chExitUnlock := make(chan struct{})
+	chCtx1Complete := make(chan struct{})
+	chCtx2Complete := make(chan struct{})
+
+	var ctx1err, ctx2err error
+
+	unlockCb := func(args ...interface{}) interface{} {
+		ctx1.Unlocked(func() {
+			// Let the test know we're in the unlocked section
+			chUnlockStart <- struct{}{}
+
+			// Wait until we're no longer needed
+			<-chExitUnlock
+		})
+		return "ctx1retval"
+	}
+	ctx1.AddFunc("unlockCb", unlockCb)
+
+	// Run unlockCb in ctx1 and check its return value
+	runUnlockCb := func() {
+		val, err := ctx1.Eval("unlockCb();", "ctx1")
+		if err == nil && val != "ctx1retval" {
+			ctx1err = errors.New("Bad return value in unlockCb")
+		} else {
+			ctx1err = err
+		}
+		chCtx1Complete <- struct{}{}
+	}
+	go runUnlockCb()
+
+	// Wait for unlockCb to enter the unlocked section
+	err := waitForChannel("chUnlockStart", chUnlockStart)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Meanwhile we can do stuff on ctx2 in the same isolate
+	go func() {
+		_, ctx2err = ctx2.Eval("'testing123';", "ctx2")
+		chCtx2Complete <- struct{}{}
+	}()
+
+	// Wait for ctx2 to finish
+	err = waitForChannel("chCtx2Complete", chCtx2Complete)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ctx2err != nil {
+		t.Fatal(ctx2err)
+	}
+
+	// Tell the unlocked section we're done
+	chExitUnlock <- struct{}{}
+
+	// Make sure ctx1 finishes cleanly with no errors
+	err = waitForChannel("chCtx1Complete", chCtx1Complete)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ctx1err != nil {
+		t.Fatal(ctx1err)
+	}
+
+	// Test out termination when in the unlock section
+	go runUnlockCb()
+	err = waitForChannel("chUnlockStart", chUnlockStart)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx1.Terminate()
+
+	// V8 can't terminate our go code. But we still expect an ErrTerminated once
+	// we return
+	chExitUnlock <- struct{}{}
+	err = waitForChannel("chCtx1Complete", chCtx1Complete)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ctx1err != ErrTerminated {
+		t.Fatalf("Expected ErrTerminated, received %v", ctx1err)
 	}
 }

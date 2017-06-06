@@ -108,7 +108,32 @@ void _go_call_raw(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 };
 
-V8Context::V8Context(v8::Isolate* isolate) : mIsolate(isolate) {
+class ErrorReporter {
+ public:
+  ErrorReporter(v8::Isolate *isolate, v8::TryCatch* try_catch, std::string* error, bool* terminated)
+    : mIsolate(isolate), mTryCatch(try_catch), mError(error), mTerminated(terminated)
+  {
+    mError->clear();
+    *mTerminated = false;
+  }
+
+  ~ErrorReporter() {
+    *mTerminated = mTryCatch->HasTerminated();
+    if (mTryCatch->HasCaught()) {
+      *mError = report_exception(*mTryCatch);
+    }
+  }
+
+ private:
+  std::string report_exception(v8::TryCatch& try_catch);
+
+  v8::Isolate* mIsolate;
+  v8::TryCatch* mTryCatch;
+  std::string *mError;
+  bool *mTerminated;
+};
+
+V8Context::V8Context(v8::Isolate* isolate) : mIsolate(isolate), mTerminated(false) {
   v8::Locker lock(mIsolate);
   v8::Isolate::Scope isolate_scope(mIsolate);
   v8::HandleScope handle_scope(mIsolate);
@@ -137,21 +162,19 @@ char* V8Context::Execute(const char* source, const char* filename) {
   v8::TryCatch try_catch;
   try_catch.SetVerbose(false);
 
-  mLastError.clear();
+  ErrorReporter er(mIsolate, &try_catch, &mLastError, &mTerminated);
 
   v8::Local<v8::Script> script = v8::Script::Compile(
       v8::String::NewFromUtf8(mIsolate, source),
       v8::String::NewFromUtf8(mIsolate, filename ? filename : "undefined"));
 
   if (script.IsEmpty()) {
-    mLastError = report_exception(try_catch);
     return NULL;
   }
 
   v8::Local<v8::Value> result = script->Run();
 
   if (result.IsEmpty()) {
-    mLastError = report_exception(try_catch);
     return NULL;
   }
 
@@ -160,7 +183,6 @@ char* V8Context::Execute(const char* source, const char* filename) {
   } else {
     std::string json = to_json(mIsolate, result);
     if (json == "") {
-      mLastError = report_exception(try_catch);
       return NULL;
     }
     return strdup(json.c_str());
@@ -175,7 +197,7 @@ PersistentValuePtr V8Context::Eval(const char* source, const char* filename) {
   v8::TryCatch try_catch;
   try_catch.SetVerbose(false);
 
-  mLastError.clear();
+  ErrorReporter er(mIsolate, &try_catch, &mLastError, &mTerminated);
 
   v8::Local<v8::Script> script = v8::Script::Compile(
       v8::String::NewFromUtf8(mIsolate, source),
@@ -183,14 +205,12 @@ PersistentValuePtr V8Context::Eval(const char* source, const char* filename) {
                : v8::String::NewFromUtf8(mIsolate, "undefined"));
 
   if (script.IsEmpty()) {
-    mLastError = report_exception(try_catch);
     return NULL;
   }
 
   v8::Local<v8::Value> result = script->Run();
 
   if (result.IsEmpty()) {
-    mLastError = report_exception(try_catch);
     return NULL;
   }
 
@@ -207,7 +227,7 @@ PersistentValuePtr V8Context::Apply(PersistentValuePtr func,
   v8::TryCatch try_catch;
   try_catch.SetVerbose(false);
 
-  mLastError.clear();
+  ErrorReporter er(mIsolate, &try_catch, &mLastError, &mTerminated);
 
   v8::Local<v8::Value> pfunc =
       static_cast<v8::Persistent<v8::Value>*>(func)->Get(mIsolate);
@@ -233,7 +253,6 @@ PersistentValuePtr V8Context::Apply(PersistentValuePtr func,
   delete[] vargs;
 
   if (result.IsEmpty()) {
-    mLastError = report_exception(try_catch);
     return NULL;
   }
 
@@ -248,9 +267,11 @@ char* V8Context::PersistentToJSON(PersistentValuePtr persistent) {
   v8::TryCatch try_catch;
   v8::Local<v8::Value> persist =
       static_cast<v8::Persistent<v8::Value>*>(persistent)->Get(mIsolate);
+
+  ErrorReporter er(mIsolate, &try_catch, &mLastError, &mTerminated);
+
   std::string json_str = to_json(mIsolate, persist);
   if (json_str == "") {
-    mLastError = report_exception(try_catch);
     return NULL;
   }
   return strdup(json_str.c_str());
@@ -337,7 +358,7 @@ KeyValuePair* V8Context::BurstPersistent(PersistentValuePtr persistent,
   return result;
 }
 
-std::string V8Context::report_exception(v8::TryCatch& try_catch) {
+std::string ErrorReporter::report_exception(v8::TryCatch& try_catch) {
   std::stringstream ss;
   ss << "Uncaught exception: ";
 
@@ -376,4 +397,8 @@ void V8Context::Throw(const char* errmsg) {
 char* V8Context::Error() {
   v8::Locker locker(mIsolate);
   return strdup(mLastError.c_str());
+}
+
+bool V8Context::HasTerminated() const {
+  return mTerminated;
 }

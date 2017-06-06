@@ -1,6 +1,8 @@
 #ifndef V8WRAP_H
 #define V8WRAP_H
 
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -10,6 +12,7 @@ typedef void *ContextPtr;
 typedef void *PersistentValuePtr;
 typedef void *PlatformPtr;
 typedef void *SnapshotPtr;
+typedef void *UnlockerPtr;
 
 extern PlatformPtr v8_init();
 
@@ -62,9 +65,16 @@ extern void v8_release_persistent(ContextPtr ctx,
 
 extern char *v8_error(ContextPtr ctx);
 
+extern bool v8_context_has_terminated(ContextPtr ctx);
+
 extern void v8_throw(ContextPtr ctx, char *errmsg);
 
 extern void v8_terminate(IsolatePtr iso);
+
+extern UnlockerPtr v8_create_unlocker(IsolatePtr isolate);
+
+extern void v8_release_unlocker(UnlockerPtr unlocker);
+
 
 #ifdef __cplusplus
 }

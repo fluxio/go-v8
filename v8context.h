@@ -31,12 +31,15 @@ class V8Context {
 
   void Throw(const char* errmsg);
 
- private:
-  std::string report_exception(v8::TryCatch& try_catch);
+  bool HasTerminated() const;
 
+ private:
   v8::Isolate* mIsolate;
   v8::Persistent<v8::Context> mContext;
   std::string mLastError;
+
+  // If true, the last JS execution was terminated prematurely
+  bool mTerminated;
 };
 
 #endif  // !defined(V8CONTEXT_H)

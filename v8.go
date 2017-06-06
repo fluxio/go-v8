@@ -24,6 +24,13 @@ var contexts = make(map[uint]*V8Context)
 var contextsMutex sync.RWMutex
 var highestContextId uint
 
+// Error returned if the operation is terminated prematurely via Terminate().
+// NOTE: this error may be returned even when Terminate() is not called on
+// a specific context, as there is no way to tell v8 to terminate only
+// a certain context -- the call is on the isolate level.
+// TODO(avaskys): Move the Terminate() function from the context to the isolate.
+var ErrTerminated = errors.New("Operation terminated prematurely")
+
 // A constant indicating that a particular script evaluation is not associated
 // with any file.
 const NO_FILE = ""
@@ -42,6 +49,9 @@ func (v *Value) ToJSON() (string, error) {
 	}
 	str := C.PersistentToJSON(v.ctx.v8context, v.ptr)
 	if str == nil {
+		if C.v8_context_has_terminated(v.ctx.v8context) {
+			return "", ErrTerminated
+		}
 		err := C.v8_error(v.ctx.v8context)
 		out := C.GoString(err)
 		C.free(unsafe.Pointer(err))
@@ -78,6 +88,9 @@ func (v *Value) Burst() (map[string]*Value, error) {
 	keyValuesPtr := C.v8_BurstPersistent(v.ctx.v8context, v.ptr, &numKeys)
 
 	if keyValuesPtr == nil {
+		if C.v8_context_has_terminated(v.ctx.v8context) {
+			return nil, ErrTerminated
+		}
 		err := C.v8_error(v.ctx.v8context)
 		defer C.free(unsafe.Pointer(err))
 		return nil, errors.New(C.GoString(err))
@@ -245,6 +258,8 @@ type V8Isolate struct {
 }
 
 // V8Context is a handle to a v8 context.
+// NOTE: The current context implementation is not threadsafe and should only
+// be accessed from one goroutine at a time.
 type V8Context struct {
 	id        uint
 	v8context C.ContextPtr
@@ -412,6 +427,9 @@ func (v *V8Context) Eval(javascript string, filename string) (res interface{}, e
 		}
 		return out, nil
 	}
+	if C.v8_context_has_terminated(v.v8context) {
+		return "", ErrTerminated
+	}
 	ret = C.v8_error(v.v8context)
 	out := C.GoString(ret)
 	C.free(unsafe.Pointer(ret))
@@ -511,6 +529,9 @@ func (ctx *V8Context) EvalRaw(js string, filename string) (*Value, error) {
 
 	ret := C.v8_eval(ctx.v8context, jsPtr, filenamePtr)
 	if ret == nil {
+		if C.v8_context_has_terminated(ctx.v8context) {
+			return nil, ErrTerminated
+		}
 		err := C.v8_error(ctx.v8context)
 		defer C.free(unsafe.Pointer(err))
 		return nil, fmt.Errorf("Failed to execute JS (%s): %s", filename, C.GoString(err))
@@ -543,6 +564,9 @@ func (ctx *V8Context) Apply(f, this *Value, args ...*Value) (*Value, error) {
 	}
 	ret := C.v8_apply(ctx.v8context, f.ptr, thisPtr, C.int(len(args)), &argPtrs[0])
 	if ret == nil {
+		if C.v8_context_has_terminated(ctx.v8context) {
+			return nil, ErrTerminated
+		}
 		err := C.v8_error(ctx.v8context)
 		defer C.free(unsafe.Pointer(err))
 		return nil, errors.New(C.GoString(err))
@@ -621,4 +645,17 @@ func funcInfo(function interface{}) (name, filepath string, line int) {
 	f := runtime.FuncForPC(ptr.Pointer())
 	file, line := f.FileLine(f.Entry())
 	return f.Name(), file, line
+}
+
+// Unlocked runs the passed-in function with the isolate of the given context
+// unlocked. This is intended to be used for long-running callbacks that don't
+// access javascript at all, and allows other threads to access the isolate while
+// the callback is running. You may not call any functions on the context or
+// isolate within the run() function, nor may you interact with any V8 values
+// at all.
+func (v *V8Context) Unlocked(run func()) {
+	unlocker := C.v8_create_unlocker(v.v8isolate.v8isolate)
+	defer C.v8_release_unlocker(unlocker)
+
+	run()
 }
